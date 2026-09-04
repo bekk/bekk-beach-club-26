@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# bin/welcome — printed automatically in every new terminal window.
+# Hooked up by adding to ~/.zshrc:   cd ~/demo && ./bin/welcome
+
+C_C=$'\e[38;5;80m'; C_Y=$'\e[38;5;222m'; C_D=$'\e[2m'; C_B=$'\e[1m'; C_X=$'\e[0m'
+
+TEAM=$(git -C ~/demo branch --show-current 2>/dev/null || echo "team-??")
+NUM=${TEAM##*-}
+
+clear
+cat <<EOF
+
+${C_C}   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~${C_X}
+${C_Y}       B E K K   B E A C H   C L U B${C_X}
+${C_C}   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~${C_X}
+
+${C_D}                           team ${C_B}${NUM}${C_X}
+
+
+   ${C_B}Type${C_X}  ${C_Y}${C_B}start${C_X}  ${C_B}and press enter.${C_X}
+
+EOF
