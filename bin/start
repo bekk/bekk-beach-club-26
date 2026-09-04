@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# bin/start — students type: start
+# One prompt. One shot. Streams Claude's output live.
+
+set -uo pipefail
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" || exit 1
+
+C_R=$'\e[38;5;209m'; C_C=$'\e[38;5;80m'; C_Y=$'\e[38;5;222m'
+C_G=$'\e[38;5;114m'; C_D=$'\e[2m'; C_B=$'\e[1m'; C_X=$'\e[0m'
+
+TEAM=$(git branch --show-current 2>/dev/null || echo "team-00")
+NUM=${TEAM##*-}
+LOCK=".shipped"
+
+clear
+cat <<BANNER
+
+${C_C}   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~${C_X}
+${C_Y}       B E K K   B E A C H   C L U B${C_X}
+${C_C}   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~${C_X}
+
+${C_D}                           team ${C_B}${NUM}${C_X}
+
+BANNER
+
+if [[ -f "$LOCK" && "${1:-}" != "--force" ]]; then
+  echo "${C_R}  You have already used your prompt.${C_X}"
+  echo "${C_D}  Type ${C_X}${C_B}finish${C_X}${C_D} to ship it.${C_X}"
+  echo
+  exit 1
+fi
+
+echo "${C_B}  You get ONE prompt. Make it count.${C_X}"
+echo "${C_D}  Write it below. Press ENTER on an empty line when done.${C_X}"
+echo "${C_D}  -----------------------------------------------------${C_X}"
+echo
+
+PROMPT=""
+while IFS= read -r line; do
+  if [[ -z "$line" ]]; then
+    [[ -n "$PROMPT" ]] && break
+    continue
+  fi
+  PROMPT+="$line"$'\n'
+done
+PROMPT="${PROMPT%$'\n'}"
+
+[[ -z "$PROMPT" ]] && { echo "${C_R}  Nothing entered.${C_X}"; exit 1; }
+
+echo
+echo "${C_D}  -----------------------------------------------------${C_X}"
+echo "${C_Y}  This is your final prompt:${C_X}"
+echo
+printf '%s\n' "$PROMPT" | sed 's/^/    /'
+echo
+echo "${C_D}  -----------------------------------------------------${C_X}"
+printf "${C_C}  Send it? ${C_D}(no second chances)${C_X} [y/N] "
+read -r ok </dev/tty
+
+if [[ ! "$ok" =~ ^[YyJj]$ ]]; then
+  echo "${C_D}  Cancelled. Run ${C_X}${C_B}start${C_X}${C_D} again.${C_X}"
+  exit 0
+fi
+
+echo
+echo "${C_C}  > Claude is working. Watch your preview - it changes live.${C_X}"
+echo "${C_D}  -----------------------------------------------------${C_X}"
+echo
+
+# streams straight to the terminal, no buffering
+if claude -p "$PROMPT" --permission-mode acceptEdits; then
+  touch "$LOCK"
+  printf '%s' "$PROMPT" > .prompt
+  echo
+  echo "${C_D}  -----------------------------------------------------${C_X}"
+  echo "${C_G}  > Done.${C_X} ${C_D}Check your preview.${C_X}"
+  echo
+  echo "${C_Y}    Happy with it? Type: ${C_B}finish${C_X}"
+  echo
+else
+  echo
+  echo "${C_R}  Claude failed. Grab a facilitator.${C_X}"
+  echo
+  exit 1
+fi

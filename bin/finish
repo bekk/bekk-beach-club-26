@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# bin/finish — students type: finish
+# Commits, pushes, Vercel deploys.
+
+set -uo pipefail
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" || exit 1
+
+C_R=$'\e[38;5;209m'; C_C=$'\e[38;5;80m'; C_Y=$'\e[38;5;222m'
+C_G=$'\e[38;5;114m'; C_D=$'\e[2m'; C_B=$'\e[1m'; C_X=$'\e[0m'
+
+PROJECT="bekk-beach-club-26"
+SCOPE="arnes-projects-8fde6be5"
+
+TEAM=$(git branch --show-current)
+NUM=${TEAM##*-}
+URL="https://${PROJECT}-git-${TEAM}-${SCOPE}.vercel.app"
+
+echo
+if [[ -z $(git status --porcelain) ]]; then
+  echo "${C_R}  Nothing has changed yet.${C_X} ${C_D}Run ${C_X}${C_B}start${C_X}${C_D} first.${C_X}"
+  echo
+  exit 1
+fi
+
+echo "${C_C}  > Shipping team ${NUM}...${C_X}"
+
+git add -A >/dev/null 2>&1
+git commit -q -m "team-${NUM}: shipped $(date +%H:%M:%S)" >/dev/null 2>&1
+
+if git push -qf origin "HEAD:${TEAM}" 2>/dev/null; then
+  cat <<EOF
+
+${C_Y}${C_B}      S H I P P E D${C_X}
+
+${C_D}      live in about 40 seconds:${C_X}
+      ${C_B}${URL}${C_X}
+
+${C_G}      Now look at the big screen.${C_X}
+
+EOF
+else
+  echo
+  echo "${C_R}  Push failed. Grab a facilitator.${C_X}"
+  echo
+  exit 1
+fi
