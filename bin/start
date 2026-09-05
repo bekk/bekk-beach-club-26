@@ -34,6 +34,17 @@ BANNER
 
 rule() { echo "${C_D}  -----------------------------------------------------${C_X}"; }
 
+# Ctrl-C: explain rather than dumping to a bare shell
+on_interrupt() {
+  echo
+  echo
+  echo "${C_Y}  Stopped.${C_X}"
+  echo "${C_D}  Nothing was lost. Type ${C_X}${C_B}start${C_X}${C_D} to go again.${C_X}"
+  echo
+  exit 130
+}
+trap on_interrupt INT
+
 # ============================================================
 # main loop: repeats only if Claude produced no changes
 # ============================================================
