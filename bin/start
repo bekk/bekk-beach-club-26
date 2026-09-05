@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # bin/start — students type: start
-# One prompt. One shot. Streams Claude's output live.
+# Prompt -> Claude -> ships automatically.
+# If Claude changed nothing, loops back so they can try again.
 
 set -uo pipefail
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" || exit 1
@@ -8,12 +9,19 @@ cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" || exit 1
 C_R=$'\e[38;5;209m'; C_C=$'\e[38;5;80m'; C_Y=$'\e[38;5;222m'
 C_G=$'\e[38;5;114m'; C_D=$'\e[2m'; C_B=$'\e[1m'; C_X=$'\e[0m'
 
+PROJECT="bekk-beach-club-26"
+SCOPE="arnes-projects-8fde6be5"
+
+LIMIT="${BC_TIMEOUT:-180}"
+MODEL="${BC_MODEL:-claude-sonnet-5}"
+
 TEAM=$(git branch --show-current 2>/dev/null || echo "team-00")
 NUM=${TEAM##*-}
-LOCK=".shipped"
+URL="https://${PROJECT}-git-${TEAM}-${SCOPE}.vercel.app"
 
-clear
-cat <<BANNER
+banner() {
+  clear
+  cat <<BANNER
 
 ${C_C}   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~${C_X}
 ${C_Y}       B E K K   B E A C H   C L U B${C_X}
@@ -22,64 +30,124 @@ ${C_C}   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~${C_X}
 ${C_D}                           team ${C_B}${NUM}${C_X}
 
 BANNER
+}
 
-if [[ -f "$LOCK" && "${1:-}" != "--force" ]]; then
-  echo "${C_R}  You have already used your prompt.${C_X}"
-  echo "${C_D}  Type ${C_X}${C_B}finish${C_X}${C_D} to ship it.${C_X}"
+rule() { echo "${C_D}  -----------------------------------------------------${C_X}"; }
+
+# ============================================================
+# main loop: repeats only if Claude produced no changes
+# ============================================================
+while true; do
+
+  banner
+  echo "${C_B}  Write your prompt. It ships automatically when Claude is done.${C_X}"
+  echo "${C_D}  Press ENTER on an empty line to send.${C_X}"
+  rule
   echo
-  exit 1
-fi
 
-echo "${C_B}  You get ONE prompt. Make it count.${C_X}"
-echo "${C_D}  Write it below. Press ENTER on an empty line when done.${C_X}"
-echo "${C_D}  -----------------------------------------------------${C_X}"
-echo
+  PROMPT=""
+  while IFS= read -r line; do
+    if [[ -z "$line" ]]; then
+      [[ -n "$PROMPT" ]] && break
+      continue
+    fi
+    PROMPT+="$line"$'\n'
+  done
+  PROMPT="${PROMPT%$'\n'}"
 
-PROMPT=""
-while IFS= read -r line; do
-  if [[ -z "$line" ]]; then
-    [[ -n "$PROMPT" ]] && break
+  if [[ -z "$PROMPT" ]]; then
+    echo "${C_R}  Nothing entered.${C_X}"; exit 1
+  fi
+
+  echo
+  rule
+  echo "${C_Y}  This is your final prompt:${C_X}"
+  echo
+  printf '%s\n' "$PROMPT" | sed 's/^/    /'
+  echo
+  rule
+  printf "${C_C}  Send it? ${C_D}(no second chances)${C_X} [y/N] "
+  read -r ok </dev/tty
+
+  if [[ ! "$ok" =~ ^[YyJj]$ ]]; then
+    echo "${C_D}  Cancelled.${C_X}"
     continue
   fi
-  PROMPT+="$line"$'\n'
+
+  echo
+  echo "${C_C}  > Claude is working. Watch your preview - it changes live.${C_X}"
+  echo "${C_D}  > Ships automatically when it finishes (max ${LIMIT}s).${C_X}"
+  rule
+  echo
+
+  claude -p "$PROMPT" --permission-mode acceptEdits --model "$MODEL" &
+  CPID=$!
+  ( sleep "$LIMIT"; kill -TERM "$CPID" 2>/dev/null ) &
+  WPID=$!
+  wait "$CPID"; RC=$?
+  kill "$WPID" 2>/dev/null; wait "$WPID" 2>/dev/null
+
+  echo
+  rule
+  [[ $RC -eq 143 ]] && echo "${C_Y}  > Time is up. Shipping what Claude got done.${C_X}"
+
+  # --- did anything actually change? ------------------------
+  if [[ -z $(git status --porcelain) ]]; then
+    echo
+    echo "${C_Y}  Claude did not change any files.${C_X}"
+    echo "${C_D}  It probably answered your prompt instead of editing the page.${C_X}"
+    echo "${C_D}  Try again, and be explicit - for example:${C_X}"
+    echo "${C_D}    \"Edit the page so the hero section looks like a luxury beach club\"${C_X}"
+    echo
+    printf "${C_C}  Press ENTER to write a new prompt.${C_X}"
+    read -r </dev/tty
+    continue
+  fi
+
+  break
 done
-PROMPT="${PROMPT%$'\n'}"
 
-[[ -z "$PROMPT" ]] && { echo "${C_R}  Nothing entered.${C_X}"; exit 1; }
+# ============================================================
+# ship
+# ============================================================
+echo
+echo "${C_C}  > Shipping...${C_X}"
+printf '%s' "$PROMPT" > .prompt
 
-echo
-echo "${C_D}  -----------------------------------------------------${C_X}"
-echo "${C_Y}  This is your final prompt:${C_X}"
-echo
-printf '%s\n' "$PROMPT" | sed 's/^/    /'
-echo
-echo "${C_D}  -----------------------------------------------------${C_X}"
-printf "${C_C}  Send it? ${C_D}(no second chances)${C_X} [y/N] "
-read -r ok </dev/tty
+git add -A >/dev/null 2>&1
+git commit -q -m "team-${NUM}: $(date +%H:%M:%S)" >/dev/null 2>&1
 
-if [[ ! "$ok" =~ ^[YyJj]$ ]]; then
-  echo "${C_D}  Cancelled. Run ${C_X}${C_B}start${C_X}${C_D} again.${C_X}"
+PUSH_ERR=$(git push -f origin "HEAD:${TEAM}" 2>&1)
+PUSH_RC=$?
+
+if [[ $PUSH_RC -eq 0 ]]; then
+  cat <<EOF
+
+${C_Y}${C_B}      S H I P P E D${C_X}
+
+${C_D}      live in about 40 seconds:${C_X}
+      ${C_B}${URL}${C_X}
+
+${C_G}      Now look at the big screen.${C_X}
+
+EOF
   exit 0
 fi
 
+# --- push failed: say why ----------------------------------
 echo
-echo "${C_C}  > Claude is working. Watch your preview - it changes live.${C_X}"
-echo "${C_D}  -----------------------------------------------------${C_X}"
-echo
-
-# streams straight to the terminal, no buffering
-if claude -p "$PROMPT" --permission-mode acceptEdits; then
-  touch "$LOCK"
-  printf '%s' "$PROMPT" > .prompt
-  echo
-  echo "${C_D}  -----------------------------------------------------${C_X}"
-  echo "${C_G}  > Done.${C_X} ${C_D}Check your preview.${C_X}"
-  echo
-  echo "${C_Y}    Happy with it? Type: ${C_B}finish${C_X}"
-  echo
+if echo "$PUSH_ERR" | grep -qiE 'authentication|denied|403|could not read Username|invalid'; then
+  echo "${C_R}  Could not push - no access to GitHub.${C_X}"
+  echo "${C_D}  The access token is missing or expired. Grab a facilitator.${C_X}"
+elif echo "$PUSH_ERR" | grep -qiE 'could not resolve|unable to access|timed out|network'; then
+  echo "${C_R}  Could not push - no network.${C_X}"
+  echo "${C_D}  Check the wifi, then run ${C_X}${C_B}finish${C_X}${C_D} to try again.${C_X}"
 else
-  echo
-  echo "${C_R}  Claude failed. Grab a facilitator.${C_X}"
-  echo
-  exit 1
+  echo "${C_R}  Push failed.${C_X}"
+  echo "${C_D}  $(echo "$PUSH_ERR" | tail -2 | tr '\n' ' ')${C_X}"
+  echo "${C_D}  Run ${C_X}${C_B}finish${C_X}${C_D} to retry, or grab a facilitator.${C_X}"
 fi
+echo
+echo "${C_D}  Your work is saved locally - nothing is lost.${C_X}"
+echo
+exit 1
