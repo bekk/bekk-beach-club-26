@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# bin/start — students type: start
-# Prompt -> Claude -> ships automatically.
-# If Claude changed nothing, loops back so they can try again.
+# bin/start — studentene skriver: start
+# Nullstiller, tar imot én prompt, kjører Claude, publiserer automatisk.
 
 set -uo pipefail
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" || exit 1
@@ -27,39 +26,65 @@ ${C_C}   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~${C_X}
 ${C_Y}       B E K K   B E A C H   C L U B${C_X}
 ${C_C}   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~${C_X}
 
-${C_D}                           team ${C_B}${NUM}${C_X}
+${C_D}                            lag ${C_B}${NUM}${C_X}
 
 BANNER
 }
 
-rule() { echo "${C_D}  -----------------------------------------------------${C_X}"; }
+rule() { echo "${C_D}  ---------------------------------------------------${C_X}"; }
 
-# Ctrl-C: explain rather than dumping to a bare shell
 on_interrupt() {
-  echo
-  echo
-  echo "${C_Y}  Stopped.${C_X}"
-  echo "${C_D}  Nothing was lost. Type ${C_X}${C_B}start${C_X}${C_D} to go again.${C_X}"
+  echo; echo
+  echo "${C_Y}  Stoppet.${C_X}"
+  echo "${C_D}  Ingenting gikk tapt. Skriv ${C_X}${C_B}start${C_X}${C_D} for å prøve igjen.${C_X}"
   echo
   exit 130
 }
 trap on_interrupt INT
 
 # ============================================================
-# main loop: repeats only if Claude produced no changes
+# Blanke ark: fjerner alt forrige gruppe gjorde.
+#   BC_NO_RESET=1 start   beholder nåværende tilstand
+# ============================================================
+if [[ -z "${BC_NO_RESET:-}" ]]; then
+  banner
+  echo "${C_D}  Gjør klar en ny side...${C_X}"
+  echo
+
+  pkill -f "claude -p" 2>/dev/null
+
+  if git fetch -q origin main 2>/dev/null; then
+    git reset -q --hard origin/main 2>/dev/null
+    git clean -qfd 2>/dev/null
+    rm -f .prompt .shipped
+  else
+    echo "${C_Y}  Fikk ikke kontakt med GitHub - bruker siden som den er.${C_X}"
+    echo "${C_D}  Si fra til en av oss hvis siden ser rar ut.${C_X}"
+    sleep 2
+  fi
+fi
+
+# ============================================================
+# Hovedløkke. Går rundt igjen bare hvis Claude ikke endret noe.
 # ============================================================
 while true; do
 
   banner
-  echo "${C_B}  Write your prompt. It ships automatically when Claude is done.${C_X}"
-  echo "${C_D}  Press ENTER on an empty line to send.${C_X}"
-  rule
+  echo "${C_B}  Dere får én prompt. Den publiseres automatisk.${C_X}"
+  echo
+  echo "${C_Y}  ┌───────────────────────────────────────────────┐${C_X}"
+  echo "${C_Y}  │${C_X}  ${C_B}Skriv prompten under.${C_X}                        ${C_Y}│${C_X}"
+  echo "${C_Y}  │${C_X}  ${C_B}Trykk ENTER to ganger for å sende.${C_X}           ${C_Y}│${C_X}"
+  echo "${C_Y}  └───────────────────────────────────────────────┘${C_X}"
   echo
 
   PROMPT=""
-  while IFS= read -r line; do
+  while true; do
+    printf "${C_C}  > ${C_X}"
+    IFS= read -r line </dev/tty || break
     if [[ -z "$line" ]]; then
       [[ -n "$PROMPT" ]] && break
+      printf "\033[1A\033[2K"   # tom linje uten tekst: bare tegn på nytt
       continue
     fi
     PROMPT+="$line"$'\n'
@@ -67,27 +92,28 @@ while true; do
   PROMPT="${PROMPT%$'\n'}"
 
   if [[ -z "$PROMPT" ]]; then
-    echo "${C_R}  Nothing entered.${C_X}"; exit 1
+    echo "${C_R}  Ingenting skrevet inn.${C_X}"; exit 1
   fi
 
   echo
   rule
-  echo "${C_Y}  This is your final prompt:${C_X}"
+  echo "${C_Y}  Dette er prompten deres:${C_X}"
   echo
   printf '%s\n' "$PROMPT" | sed 's/^/    /'
   echo
   rule
-  printf "${C_C}  Send it? ${C_D}(no second chances)${C_X} [y/N] "
+  printf "${C_C}  Send den? ${C_D}(ingen omkamp)${C_X} ${C_B}[Y/n]${C_X} "
   read -r ok </dev/tty
 
-  if [[ ! "$ok" =~ ^[YyJj]$ ]]; then
-    echo "${C_D}  Cancelled.${C_X}"
+  if [[ -n "$ok" && ! "$ok" =~ ^[JjYy]$ ]]; then
+    echo "${C_D}  Avbrutt.${C_X}"
+    sleep 1
     continue
   fi
 
   echo
-  echo "${C_C}  > Claude is working. Watch your preview - it changes live.${C_X}"
-  echo "${C_D}  > Ships automatically when it finishes (max ${LIMIT}s).${C_X}"
+  echo "${C_C}  Claude jobber. Se på forhåndsvisningen - siden endrer seg live.${C_X}"
+  echo "${C_D}  Publiseres automatisk når den er ferdig (maks ${LIMIT} sek).${C_X}"
   rule
   echo
 
@@ -100,17 +126,16 @@ while true; do
 
   echo
   rule
-  [[ $RC -eq 143 ]] && echo "${C_Y}  > Time is up. Shipping what Claude got done.${C_X}"
+  [[ $RC -eq 143 ]] && echo "${C_Y}  Tiden er ute. Publiserer det Claude rakk.${C_X}"
 
-  # --- did anything actually change? ------------------------
   if [[ -z $(git status --porcelain) ]]; then
     echo
-    echo "${C_Y}  Claude did not change any files.${C_X}"
-    echo "${C_D}  It probably answered your prompt instead of editing the page.${C_X}"
-    echo "${C_D}  Try again, and be explicit - for example:${C_X}"
-    echo "${C_D}    \"Edit the page so the hero section looks like a luxury beach club\"${C_X}"
+    echo "${C_Y}  Claude endret ingen filer.${C_X}"
+    echo "${C_D}  Den svarte trolig på prompten i stedet for å endre siden.${C_X}"
+    echo "${C_D}  Prøv igjen, og vær tydelig - for eksempel:${C_X}"
+    echo "${C_D}    \"Endre siden slik at toppen ser ut som en luksus-beachclub\"${C_X}"
     echo
-    printf "${C_C}  Press ENTER to write a new prompt.${C_X}"
+    printf "${C_C}  Trykk ENTER for å skrive en ny prompt.${C_X}"
     read -r </dev/tty
     continue
   fi
@@ -119,14 +144,14 @@ while true; do
 done
 
 # ============================================================
-# ship
+# Publiser
 # ============================================================
 echo
-echo "${C_C}  > Shipping...${C_X}"
+echo "${C_C}  Publiserer...${C_X}"
 printf '%s' "$PROMPT" > .prompt
 
 git add -A >/dev/null 2>&1
-git commit -q -m "team-${NUM}: $(date +%H:%M:%S)" >/dev/null 2>&1
+git commit -q -m "lag ${NUM}: $(date +%H:%M:%S)" >/dev/null 2>&1
 
 PUSH_ERR=$(git push -f origin "HEAD:${TEAM}" 2>&1)
 PUSH_RC=$?
@@ -134,31 +159,30 @@ PUSH_RC=$?
 if [[ $PUSH_RC -eq 0 ]]; then
   cat <<EOF
 
-${C_Y}${C_B}      S H I P P E D${C_X}
+${C_Y}${C_B}      P U B L I S E R T${C_X}
 
-${C_D}      live in about 40 seconds:${C_X}
+${C_D}      live om cirka 40 sekunder:${C_X}
       ${C_B}${URL}${C_X}
 
-${C_G}      Now look at the big screen.${C_X}
+${C_G}      Se på storskjermen nå.${C_X}
 
 EOF
   exit 0
 fi
 
-# --- push failed: say why ----------------------------------
 echo
 if echo "$PUSH_ERR" | grep -qiE 'authentication|denied|403|could not read Username|invalid'; then
-  echo "${C_R}  Could not push - no access to GitHub.${C_X}"
-  echo "${C_D}  The access token is missing or expired. Grab a facilitator.${C_X}"
+  echo "${C_R}  Fikk ikke publisert - ingen tilgang til GitHub.${C_X}"
+  echo "${C_D}  Tilgangsnøkkelen mangler eller er utløpt. Si fra til en av oss.${C_X}"
 elif echo "$PUSH_ERR" | grep -qiE 'could not resolve|unable to access|timed out|network'; then
-  echo "${C_R}  Could not push - no network.${C_X}"
-  echo "${C_D}  Check the wifi, then run ${C_X}${C_B}finish${C_X}${C_D} to try again.${C_X}"
+  echo "${C_R}  Fikk ikke publisert - ingen nettverkstilgang.${C_X}"
+  echo "${C_D}  Sjekk wifi, og skriv ${C_X}${C_B}finish${C_X}${C_D} for å prøve igjen.${C_X}"
 else
-  echo "${C_R}  Push failed.${C_X}"
+  echo "${C_R}  Publisering feilet.${C_X}"
   echo "${C_D}  $(echo "$PUSH_ERR" | tail -2 | tr '\n' ' ')${C_X}"
-  echo "${C_D}  Run ${C_X}${C_B}finish${C_X}${C_D} to retry, or grab a facilitator.${C_X}"
+  echo "${C_D}  Skriv ${C_X}${C_B}finish${C_X}${C_D} for å prøve igjen, eller si fra til en av oss.${C_X}"
 fi
 echo
-echo "${C_D}  Your work is saved locally - nothing is lost.${C_X}"
+echo "${C_D}  Arbeidet deres ligger lagret lokalt - ingenting er tapt.${C_X}"
 echo
 exit 1

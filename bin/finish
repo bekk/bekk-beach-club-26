@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# bin/finish — students type: finish
-# Commits, pushes, Vercel deploys.
+# bin/finish — reserveløsning. Publiserer det som allerede ligger lokalt.
+# Brukes bare hvis `start` ikke fikk pushet.
 
 set -uo pipefail
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" || exit 1
@@ -16,31 +16,31 @@ NUM=${TEAM##*-}
 URL="https://${PROJECT}-git-${TEAM}-${SCOPE}.vercel.app"
 
 echo
-if [[ -z $(git status --porcelain) ]]; then
-  echo "${C_R}  Nothing has changed yet.${C_X} ${C_D}Run ${C_X}${C_B}start${C_X}${C_D} first.${C_X}"
+if [[ -z $(git status --porcelain) ]] && git diff --quiet "origin/${TEAM}" HEAD 2>/dev/null; then
+  echo "${C_R}  Ingenting å publisere.${C_X} ${C_D}Skriv ${C_X}${C_B}start${C_X}${C_D} først.${C_X}"
   echo
   exit 1
 fi
 
-echo "${C_C}  > Shipping team ${NUM}...${C_X}"
+echo "${C_C}  Publiserer lag ${NUM}...${C_X}"
 
 git add -A >/dev/null 2>&1
-git commit -q -m "team-${NUM}: shipped $(date +%H:%M:%S)" >/dev/null 2>&1
+git commit -q -m "lag ${NUM}: $(date +%H:%M:%S)" >/dev/null 2>&1
 
 if git push -qf origin "HEAD:${TEAM}" 2>/dev/null; then
   cat <<EOF
 
-${C_Y}${C_B}      S H I P P E D${C_X}
+${C_Y}${C_B}      P U B L I S E R T${C_X}
 
-${C_D}      live in about 40 seconds:${C_X}
+${C_D}      live om cirka 40 sekunder:${C_X}
       ${C_B}${URL}${C_X}
 
-${C_G}      Now look at the big screen.${C_X}
+${C_G}      Se på storskjermen nå.${C_X}
 
 EOF
 else
   echo
-  echo "${C_R}  Push failed. Grab a facilitator.${C_X}"
+  echo "${C_R}  Publisering feilet. Si fra til en av oss.${C_X}"
   echo
   exit 1
 fi
