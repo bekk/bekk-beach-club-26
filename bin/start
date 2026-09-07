@@ -58,7 +58,7 @@ if [[ -z "${BC_NO_RESET:-}" ]]; then
     git clean -qfd 2>/dev/null
     rm -f .prompt .shipped
   else
-    echo "${C_Y}  Fikk ikke kontakt med GitHub - bruker siden som den er.${C_X}"
+    echo "${C_Y}  Fikk ikke kontakt med GitHub. Bruker siden som den er.${C_X}"
     echo "${C_D}  Si fra til en av oss hvis siden ser rar ut.${C_X}"
     sleep 2
   fi
@@ -102,7 +102,7 @@ while true; do
   printf '%s\n' "$PROMPT" | sed 's/^/    /'
   echo
   rule
-  printf "${C_C}  Send den? ${C_D}(ingen omkamp)${C_X} ${C_B}[Y/n]${C_X} "
+  printf "${C_C}  Klar til å sende til Claude? ${C_X}${C_B}[Y/n]${C_X} "
   read -r ok </dev/tty
 
   if [[ -n "$ok" && ! "$ok" =~ ^[JjYy]$ ]]; then
@@ -112,7 +112,7 @@ while true; do
   fi
 
   echo
-  echo "${C_C}  Claude jobber. Se på forhåndsvisningen - siden endrer seg live.${C_X}"
+  echo "${C_C}  Claude jobber. Se på forhåndsvisningen, siden endrer seg live.${C_X}"
   echo "${C_D}  Publiseres automatisk når den er ferdig (maks ${LIMIT} sek).${C_X}"
   rule
   echo
@@ -132,7 +132,7 @@ while true; do
     echo
     echo "${C_Y}  Claude endret ingen filer.${C_X}"
     echo "${C_D}  Den svarte trolig på prompten i stedet for å endre siden.${C_X}"
-    echo "${C_D}  Prøv igjen, og vær tydelig - for eksempel:${C_X}"
+    echo "${C_D}  Prøv igjen, og vær tydelig. For eksempel:${C_X}"
     echo "${C_D}    \"Endre siden slik at toppen ser ut som en luksus-beachclub\"${C_X}"
     echo
     printf "${C_C}  Trykk ENTER for å skrive en ny prompt.${C_X}"
@@ -172,10 +172,10 @@ fi
 
 echo
 if echo "$PUSH_ERR" | grep -qiE 'authentication|denied|403|could not read Username|invalid'; then
-  echo "${C_R}  Fikk ikke publisert - ingen tilgang til GitHub.${C_X}"
+  echo "${C_R}  Fikk ikke publisert. Ingen tilgang til GitHub.${C_X}"
   echo "${C_D}  Tilgangsnøkkelen mangler eller er utløpt. Si fra til en av oss.${C_X}"
 elif echo "$PUSH_ERR" | grep -qiE 'could not resolve|unable to access|timed out|network'; then
-  echo "${C_R}  Fikk ikke publisert - ingen nettverkstilgang.${C_X}"
+  echo "${C_R}  Fikk ikke publisert. Ingen nettverkstilgang.${C_X}"
   echo "${C_D}  Sjekk wifi, og skriv ${C_X}${C_B}finish${C_X}${C_D} for å prøve igjen.${C_X}"
 else
   echo "${C_R}  Publisering feilet.${C_X}"
@@ -183,6 +183,6 @@ else
   echo "${C_D}  Skriv ${C_X}${C_B}finish${C_X}${C_D} for å prøve igjen, eller si fra til en av oss.${C_X}"
 fi
 echo
-echo "${C_D}  Arbeidet deres ligger lagret lokalt - ingenting er tapt.${C_X}"
+echo "${C_D}  Arbeidet deres ligger lagret lokalt. Ingenting er tapt.${C_X}"
 echo
 exit 1
