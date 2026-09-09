@@ -12,7 +12,8 @@ PROJECT="bekk-beach-club-26"
 SCOPE="arnes-projects-8fde6be5"
 
 LIMIT="${BC_TIMEOUT:-180}"
-MODEL="${BC_MODEL:-claude-sonnet-5}"
+MODEL="${BC_MODEL:-claude-opus-5}"
+EFFORT="${BC_EFFORT:-medium}"
 
 TEAM=$(git branch --show-current 2>/dev/null || echo "team-00")
 NUM=${TEAM##*-}
@@ -126,7 +127,13 @@ while true; do
   rule
   echo
 
-  claude -p "$PROMPT" --permission-mode acceptEdits --model "$MODEL" &
+  # --effort isn't in every Claude Code version; fall back quietly if missing
+  if claude --help 2>/dev/null | grep -q -- '--effort'; then
+    claude -p "$PROMPT" --permission-mode acceptEdits \
+      --model "$MODEL" --effort "$EFFORT" &
+  else
+    claude -p "$PROMPT" --permission-mode acceptEdits --model "$MODEL" &
+  fi
   CPID=$!
   ( sleep "$LIMIT"; kill -TERM "$CPID" 2>/dev/null ) &
   WPID=$!
