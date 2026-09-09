@@ -57,6 +57,15 @@ if [[ -z "${BC_NO_RESET:-}" ]]; then
     git reset -q --hard origin/main 2>/dev/null
     git clean -qfd 2>/dev/null
     rm -f .prompt .shipped
+
+    # Publiser den blanke siden, slik at forhåndsvisningen også nullstilles.
+    # Tom commit gir en ny SHA, ellers bygger ikke Vercel på nytt.
+    git commit -q --allow-empty -m "lag ${NUM}: nullstilt $(date +%H:%M:%S)" 2>/dev/null
+    if git push -qf origin "HEAD:${TEAM}" 2>/dev/null; then
+      echo "${C_D}  Forhåndsvisningen nullstilles også, det tar cirka 40 sekunder.${C_X}"
+    else
+      echo "${C_Y}  Fikk ikke nullstilt forhåndsvisningen, men siden her er klar.${C_X}"
+    fi
   else
     echo "${C_Y}  Fikk ikke kontakt med GitHub. Bruker siden som den er.${C_X}"
     echo "${C_D}  Si fra til en av oss hvis siden ser rar ut.${C_X}"
