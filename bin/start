@@ -90,26 +90,20 @@ while true; do
   echo
 
   PROMPT=""
-  BLANKS=0
-  FIRST=1
   while true; do
-    [[ $FIRST -eq 1 ]] && printf "${C_C}  > ${C_X}"
+    printf "${C_C}  > ${C_X}"
     IFS= read -r line </dev/tty || break
-    FIRST=0
 
     # strip escape sequences and control characters that a paste can carry.
     # keeps tab and newline; drops ESC, DEL, bell, arrow-key junk.
     line=$(printf '%s' "$line" | tr -d '\000-\010\013\014\016-\037\177')
 
     if [[ -z "${line//[[:space:]]/}" ]]; then
-      if [[ -n "$PROMPT" ]]; then
-        BLANKS=$((BLANKS + 1))
-        [[ $BLANKS -ge 1 ]] && break
-      fi
+      [[ -n "$PROMPT" ]] && break
+      printf "\033[1A\033[2K"   # tom linje uten tekst: bare tegn på nytt
       continue
     fi
 
-    BLANKS=0
     PROMPT+="$line"$'\n'
   done
   PROMPT="${PROMPT%$'\n'}"
