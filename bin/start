@@ -11,8 +11,8 @@ C_G=$'\e[38;5;114m'; C_D=$'\e[2m'; C_B=$'\e[1m'; C_X=$'\e[0m'
 PROJECT="bekk-beach-club-26"
 SCOPE="arnes-projects-8fde6be5"
 
-LIMIT="${BC_TIMEOUT:-180}"
-MODEL="${BC_MODEL:-claude-opus-5}"
+LIMIT="${BC_TIMEOUT:-240}"
+MODEL="${BC_MODEL:-claude-sonnet-5}"
 EFFORT="${BC_EFFORT:-medium}"
 
 TEAM=$(git branch --show-current 2>/dev/null || echo "team-00")
@@ -80,26 +80,43 @@ fi
 while true; do
 
   banner
-  echo "${C_B}  Dere får én prompt. Den publiseres automatisk.${C_X}"
-  echo
-  echo "${C_Y}  ┌───────────────────────────────────────────────┐${C_X}"
-  echo "${C_Y}  │${C_X}  ${C_B}Skriv prompten under.${C_X}                        ${C_Y}│${C_X}"
-  echo "${C_Y}  │${C_X}  ${C_B}Trykk ENTER to ganger for å sende.${C_X}           ${C_Y}│${C_X}"
-  echo "${C_Y}  └───────────────────────────────────────────────┘${C_X}"
+  echo "${C_Y}  ┌─────────────────────────────────────────────────────┐${C_X}"
+  echo "${C_Y}  │${C_X}  ${C_B}Dere har én prompt.${C_X}                                ${C_Y}│${C_X}"
+  echo "${C_Y}  │${C_X}  ${C_B}Hjelp oss å gjøre nettsiden bedre.${C_X}                 ${C_Y}│${C_X}"
+  echo "${C_Y}  │${C_X}                                                     ${C_Y}│${C_X}"
+  echo "${C_Y}  │${C_X}  Send prompten ved å trykke ${C_B}ENTER to ganger${C_X}.        ${C_Y}│${C_X}"
+  echo "${C_Y}  │${C_X}  Etterpå tenker Sonnet 5 i maks $((LIMIT / 60)) minutter.        ${C_Y}│${C_X}"
+  echo "${C_Y}  └─────────────────────────────────────────────────────┘${C_X}"
   echo
 
   PROMPT=""
+  BLANKS=0
+  FIRST=1
   while true; do
-    printf "${C_C}  > ${C_X}"
+    [[ $FIRST -eq 1 ]] && printf "${C_C}  > ${C_X}"
     IFS= read -r line </dev/tty || break
-    if [[ -z "$line" ]]; then
-      [[ -n "$PROMPT" ]] && break
-      printf "\033[1A\033[2K"   # tom linje uten tekst: bare tegn på nytt
+    FIRST=0
+
+    # strip escape sequences and control characters that a paste can carry.
+    # keeps tab and newline; drops ESC, DEL, bell, arrow-key junk.
+    line=$(printf '%s' "$line" | tr -d '\000-\010\013\014\016-\037\177')
+
+    if [[ -z "${line//[[:space:]]/}" ]]; then
+      if [[ -n "$PROMPT" ]]; then
+        BLANKS=$((BLANKS + 1))
+        [[ $BLANKS -ge 1 ]] && break
+      fi
       continue
     fi
+
+    BLANKS=0
     PROMPT+="$line"$'\n'
   done
   PROMPT="${PROMPT%$'\n'}"
+
+  # A paste containing many newlines leaves the rest sitting in the buffer,
+  # where it would run as shell commands later. Drain it.
+  while IFS= read -r -t 0.15 _junk </dev/tty; do :; done
 
   if [[ -z "$PROMPT" ]]; then
     echo "${C_R}  Ingenting skrevet inn.${C_X}"; exit 1
@@ -123,16 +140,23 @@ while true; do
 
   echo
   echo "${C_C}  Claude jobber. Se på forhåndsvisningen, siden endrer seg live.${C_X}"
-  echo "${C_D}  Publiseres automatisk når den er ferdig (maks ${LIMIT} sek).${C_X}"
+  echo "${C_D}  Publiseres automatisk når den er ferdig (maks $((LIMIT / 60)) min).${C_X}"
   rule
   echo
 
-  # --effort isn't in every Claude Code version; fall back quietly if missing
+  NARRATE="Du vises på en skjerm foran studenter under en workshop. \
+Skriv på norsk. Før hver endring: si i én kort setning hva du skal gjøre og hvorfor. \
+Når du er ferdig: oppsummer i 2-4 punkter hva du endret, og nevn én ting du valgte \
+bort eller en svakhet ved løsningen. Ikke vis kode i oppsummeringen."
+
   if claude --help 2>/dev/null | grep -q -- '--effort'; then
     claude -p "$PROMPT" --permission-mode acceptEdits \
-      --model "$MODEL" --effort "$EFFORT" &
+      --model "$MODEL" --effort "$EFFORT" \
+      --append-system-prompt "$NARRATE" &
   else
-    claude -p "$PROMPT" --permission-mode acceptEdits --model "$MODEL" &
+    claude -p "$PROMPT" --permission-mode acceptEdits \
+      --model "$MODEL" \
+      --append-system-prompt "$NARRATE" &
   fi
   CPID=$!
   ( sleep "$LIMIT"; kill -TERM "$CPID" 2>/dev/null ) &
