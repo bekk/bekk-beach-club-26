@@ -52,17 +52,9 @@ export default function Home() {
                       <div className={"boks " + "stor"}>
                         <h3>NÅR OG HVOR</h3>
                         <h1>Hver dag</h1>
-                        <p>Tid: {data.tid} &nbsp;&nbsp; Sted: {data.sted} &nbsp;&nbsp; {data.antallAbakulere} abakulere</p>
+                        <p>Tid: {data.tid} &nbsp;&nbsp; Sted: {data.sted} &nbsp;&nbsp; Påmeldte: {data.antallPaameldte}</p>
                         <p>Linjeforening: {data.linjeforening}</p>
                         <p>{data.dresscode}</p>
-                      </div>
-
-                      <br />
-
-                      <div className="boks">
-                        <h4>NYHETER</h4>
-                        <h3>{data.nyhetTittel}</h3>
-                        <p>{data.nyhetTekst}</p>
                       </div>
 
                       <br />
